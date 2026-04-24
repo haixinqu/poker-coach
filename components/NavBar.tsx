@@ -86,7 +86,9 @@ export default function NavBar() {
         }}
       >
         <Link href="/chat" className="flex items-center gap-2 mr-1 shrink-0">
-          <SpadeIcon />
+          <span className="animate-glow-logo">
+            <SpadeIcon />
+          </span>
           <span
             className="text-sm font-semibold tracking-tight hidden sm:block"
             style={{ color: "var(--text)" }}
