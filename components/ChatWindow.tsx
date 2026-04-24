@@ -5,45 +5,55 @@ import MessageBubble from "./MessageBubble";
 import { ChatMessage } from "@/lib/types";
 
 const STORAGE_KEY = "poker-coach-messages";
-const MAX_STORED = 40;
+const MAX_STORED  = 40;
 
 const HINTS = [
-  { suit: "♠", color: "var(--text)",  text: 'I opened AQo UTG at 1/3, BTN called, flop K72r…' },
-  { suit: "♦", color: "var(--gold)",  text: 'Commerce 5/5, 6 hours, won $850. Loose table.' },
-  { suit: "♣", color: "var(--green)", text: "What's my biggest leak based on recent hands?" },
+  { suit: "♠", color: "var(--green)", text: "I opened AQo UTG at 1/3, BTN called, flop K72r, I cbet…" },
+  { suit: "♦", color: "var(--gold)",  text: "Commerce 5/5, 6 hours, won $850. Loose aggressive table." },
+  { suit: "♣", color: "var(--indigo)",text: "What's my biggest leak based on my recent hands?" },
 ];
 
 function ThinkingDots() {
   return (
-    <div className="flex items-end gap-2.5 animate-fade-in">
-      <div
-        className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center"
-        style={{ background: "rgba(22,199,132,0.12)", border: "1px solid rgba(22,199,132,0.25)" }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-          <path d="M12 2C12 2 3 9 3 14C3 17.3 5.7 20 9 20C9.9 20 10.8 19.8 11.5 19.3L11 22H13L12.5 19.3C13.2 19.8 14.1 20 15 20C18.3 20 21 17.3 21 14C21 9 12 2 12 2Z" fill="var(--green)" />
-        </svg>
-      </div>
-      <div
-        className="px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1.5"
-        style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
-      >
+    <div style={{ display: "flex", alignItems: "flex-end", gap: "0.75rem" }} className="animate-fade-in">
+      <CoachIcon />
+      <div style={{
+        padding: "1rem 1.25rem",
+        background: "var(--surface)",
+        backdropFilter: "blur(16px)",
+        border: "1px solid var(--border)",
+        borderRadius: "20px 20px 20px 4px",
+        display: "flex", alignItems: "center", gap: "0.4rem",
+      }}>
         {[0,1,2].map(i => (
-          <span key={i} className="dot-bounce w-1.5 h-1.5 rounded-full inline-block" style={{ background: "var(--text-3)" }} />
+          <span key={i} className="dot-bounce" style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "var(--text-3)" }} />
         ))}
       </div>
     </div>
   );
 }
 
-function loadMessages(): ChatMessage[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+function CoachIcon() {
+  return (
+    <div style={{
+      width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+      background: "rgba(22,199,132,0.12)",
+      border: "1px solid rgba(22,199,132,0.3)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      boxShadow: "0 0 12px rgba(22,199,132,0.2)",
+    }}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2C12 2 3 9 3 14C3 17.3 5.7 20 9 20C9.9 20 10.8 19.8 11.5 19.3L11 22H13L12.5 19.3C13.2 19.8 14.1 20 15 20C18.3 20 21 17.3 21 14C21 9 12 2 12 2Z" fill="var(--green)" />
+      </svg>
+    </div>
+  );
 }
 
+function loadMessages(): ChatMessage[] {
+  if (typeof window === "undefined") return [];
+  try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : []; }
+  catch { return []; }
+}
 function saveMessages(msgs: ChatMessage[]) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(msgs.slice(-MAX_STORED))); }
   catch { /* quota */ }
@@ -65,7 +75,7 @@ export default function ChatWindow() {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+    el.style.height = Math.min(el.scrollHeight, 180) + "px";
   }
 
   const clearHistory = useCallback(() => {
@@ -111,56 +121,46 @@ export default function ChatWindow() {
     }
   }
 
-  const lastIsAssistantStreaming = streaming && messages.length > 0 && messages[messages.length - 1].role === "assistant";
-  const showDots = streaming && !lastIsAssistantStreaming;
+  const showDots = streaming && !(messages.length > 0 && messages[messages.length-1].role === "assistant");
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden max-w-2xl mx-auto w-full px-3 md:px-4">
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", maxWidth: 800, margin: "0 auto", width: "100%", padding: "0 1rem" }}>
 
-      {/* Message area */}
-      <div className="flex-1 overflow-y-auto py-6 space-y-5">
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "2.5rem 0", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
         {!hydrated ? null : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-8 animate-fade-in">
+          <div className="animate-fade-up" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: "3rem", textAlign: "center" }}>
 
-            {/* Central icon */}
-            <div className="flex flex-col items-center gap-4">
-              <div
-                className="animate-glow-logo"
-                style={{
-                  fontSize: "3.5rem",
-                  lineHeight: 1,
-                  background: "linear-gradient(135deg, var(--green), var(--gold))",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}
-              >
-                ♠
+            {/* Hero */}
+            <div>
+              <div className="animate-glow-logo" style={{ fontSize: "5rem", lineHeight: 1, marginBottom: "1.25rem" }}>
+                <span className="gradient-text-bright">♠</span>
               </div>
-              <div className="text-center space-y-1">
-                <p className="text-base font-semibold" style={{ color: "var(--text)" }}>
-                  Your coach is ready.
-                </p>
-                <p className="text-sm" style={{ color: "var(--text-3)" }}>
-                  Describe a hand, log a session, or ask about your leaks.
-                </p>
-              </div>
+              <h1 style={{ fontSize: "clamp(2rem, 5vw, 3rem)", fontWeight: 900, letterSpacing: "-0.04em", lineHeight: 1.1, marginBottom: "0.75rem" }}>
+                Your coach is <span className="gradient-text">ready.</span>
+              </h1>
+              <p style={{ fontSize: "1.05rem", color: "var(--text-2)", maxWidth: 380, margin: "0 auto" }}>
+                Describe a hand, log a session, or ask about your leaks.
+              </p>
             </div>
 
             {/* Hint cards */}
-            <div className="flex flex-col gap-2.5 w-full max-w-sm">
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%", maxWidth: 480 }}>
               {HINTS.map((h) => (
                 <button
                   key={h.text}
                   onClick={() => { setInput(h.text); textareaRef.current?.focus(); }}
-                  className="card flex items-center gap-3 text-left text-sm px-4 py-3.5 transition-all duration-200"
-                  style={{ borderRadius: "0.875rem" }}
+                  className="glass card-3d"
+                  style={{
+                    display: "flex", alignItems: "center", gap: "1rem",
+                    textAlign: "left", padding: "1rem 1.25rem",
+                    border: "none", cursor: "pointer", width: "100%",
+                  }}
                 >
-                  <span style={{ fontSize: "1.2rem", color: h.color, lineHeight: 1, flexShrink: 0 }}>
+                  <span style={{ fontSize: "1.5rem", color: h.color, flexShrink: 0, filter: `drop-shadow(0 0 6px ${h.color}88)` }}>
                     {h.suit}
                   </span>
-                  <span className="truncate" style={{ color: "var(--text-3)", fontSize: "0.8rem" }}>
-                    {h.text}
-                  </span>
+                  <span style={{ fontSize: "0.875rem", color: "var(--text-2)", lineHeight: 1.5 }}>{h.text}</span>
                 </button>
               ))}
             </div>
@@ -180,44 +180,48 @@ export default function ChatWindow() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input area */}
-      <div className="pb-4 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+      {/* Input */}
+      <div style={{ paddingBottom: "1.5rem", paddingTop: "1rem", borderTop: "1px solid var(--border)" }}>
         {messages.length > 0 && !streaming && (
-          <div className="flex justify-end mb-2">
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
             <button
               onClick={clearHistory}
-              className="text-xs transition-colors duration-150"
-              style={{ color: "var(--text-3)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-2)")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-3)")}
+              style={{ fontSize: "0.75rem", color: "var(--text-3)", background: "none", border: "none", cursor: "pointer", transition: "color 0.15s" }}
+              onMouseEnter={(e) => e.currentTarget.style.color = "var(--text-2)"}
+              onMouseLeave={(e) => e.currentTarget.style.color = "var(--text-3)"}
             >
               Clear conversation
             </button>
           </div>
         )}
-        <form onSubmit={send} className="relative flex items-end gap-3">
+        <form onSubmit={send} style={{ display: "flex", alignItems: "flex-end", gap: "0.75rem" }}>
           <div
-            className="flex-1 relative rounded-2xl overflow-hidden transition-all duration-200"
-            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-            onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(22,199,132,0.4)")}
-            onBlur={(e)  => (e.currentTarget.style.borderColor = "var(--border)")}
+            style={{
+              flex: 1,
+              background: "var(--surface)",
+              backdropFilter: "blur(16px)",
+              border: "1px solid var(--border)",
+              borderRadius: 18,
+              overflow: "hidden",
+              transition: "border-color 0.2s, box-shadow 0.2s",
+            }}
+            onFocusCapture={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(22,199,132,0.4)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 0 0 3px rgba(22,199,132,0.06)"; }}
+            onBlurCapture={(e)  => { (e.currentTarget as HTMLElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLElement).style.boxShadow = "none"; }}
           >
             <textarea
               ref={textareaRef}
               value={input}
               onChange={(e) => { setInput(e.target.value); autoResize(); }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(e as unknown as FormEvent); }
-              }}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(e as unknown as FormEvent); } }}
               placeholder="Describe a hand, log a session, or ask anything…"
               rows={1}
               style={{
                 resize: "none", background: "transparent", color: "var(--text)",
-                fontSize: "0.875rem", lineHeight: "1.6",
-                padding: "12px 16px", width: "100%", outline: "none", border: "none",
+                fontSize: "0.95rem", lineHeight: "1.65", padding: "14px 18px",
+                width: "100%", outline: "none", border: "none", display: "block",
               }}
             />
-            <div className="px-3 pb-2 flex items-center justify-end" style={{ color: "var(--text-3)", fontSize: "0.68rem" }}>
+            <div style={{ padding: "0 18px 10px", fontSize: "0.68rem", color: "var(--text-3)", textAlign: "right" }}>
               ↵ send · shift+↵ newline
             </div>
           </div>
@@ -225,21 +229,23 @@ export default function ChatWindow() {
           <button
             type="submit"
             disabled={streaming || !input.trim()}
-            className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-150"
             style={{
-              background: streaming || !input.trim() ? "var(--surface)" : "var(--green)",
-              border: `1px solid ${streaming || !input.trim() ? "var(--border)" : "transparent"}`,
-              cursor: streaming || !input.trim() ? "not-allowed" : "pointer",
-              opacity: streaming || !input.trim() ? 0.45 : 1,
-              boxShadow: (!streaming && input.trim()) ? "0 0 16px rgba(22,199,132,0.3)" : "none",
+              width: 46, height: 46, borderRadius: 14, flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: (streaming || !input.trim()) ? "var(--surface)" : "var(--green)",
+              border: `1px solid ${(streaming || !input.trim()) ? "var(--border)" : "transparent"}`,
+              cursor: (streaming || !input.trim()) ? "not-allowed" : "pointer",
+              opacity: (streaming || !input.trim()) ? 0.4 : 1,
+              boxShadow: (!streaming && input.trim()) ? "var(--glow-green)" : "none",
+              transition: "all 0.2s",
             }}
           >
             {streaming ? (
-              <span className="w-3 h-3 rounded-sm" style={{ background: "var(--text-3)" }} />
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: "var(--text-3)", display: "block" }} />
             ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M22 2L11 13" stroke={input.trim() ? "#07070a" : "var(--text-3)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke={input.trim() ? "#07070a" : "var(--text-3)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M22 2L11 13" stroke={input.trim() ? "#050509" : "var(--text-3)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke={input.trim() ? "#050509" : "var(--text-3)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             )}
           </button>

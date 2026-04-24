@@ -10,30 +10,34 @@ export default function SessionsPage() {
   const [toast, setToast] = useState<string | null>(null);
 
   const handleLogged = useCallback(() => {
-    setRefreshKey((k) => k + 1);
+    setRefreshKey(k => k + 1);
     setToast("Session logged successfully");
   }, []);
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-2xl mx-auto px-4 md:px-6 py-10">
-        <div className="mb-8">
-          <h1
-            className="text-xl font-semibold mb-1"
-            style={{ color: "var(--text)" }}
-          >
-            Sessions
+    <div style={{ flex: 1, overflowY: "auto" }}>
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "3.5rem 1.5rem 4rem" }}>
+
+        <div className="animate-fade-up" style={{ marginBottom: "3rem" }}>
+          <h1 style={{ fontSize: "clamp(2.5rem,5vw,4rem)", fontWeight: 900, letterSpacing: "-0.04em", lineHeight: 1.05, marginBottom: "0.75rem" }}>
+            <span className="gradient-text">Sessions</span>
           </h1>
-          <p className="text-sm" style={{ color: "var(--text-3)" }}>
+          <p style={{ fontSize: "1.05rem", color: "var(--text-2)" }}>
             Log a session in plain English — we&apos;ll parse it automatically.
           </p>
         </div>
-        <SessionInput onLogged={handleLogged} />
-        <SessionHistory refreshKey={refreshKey} />
+
+        <div className="animate-fade-up" style={{ animationDelay: "0.05s" }}>
+          <SessionInput onLogged={handleLogged} />
+        </div>
+
+        <div className="animate-fade-up" style={{ animationDelay: "0.1s" }}>
+          <SessionHistory refreshKey={refreshKey} />
+        </div>
+
       </div>
-      {toast && (
-        <Toast message={toast} onClose={() => setToast(null)} />
-      )}
+
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>
   );
 }

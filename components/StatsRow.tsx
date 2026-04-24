@@ -1,120 +1,75 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-interface Stats {
-  totalHands: number;
-  totalSessions: number;
-  totalProfit: number;
-  winSessions: number;
-}
+interface Stats { totalHands: number; totalSessions: number; totalProfit: number; winSessions: number; }
 
-function useCountUp(target: number | null, duration = 1100) {
-  const [value, setValue] = useState(0);
-  const rafRef = useRef<number | null>(null);
-
+function useCountUp(target: number | null, duration = 1200) {
+  const [val, setVal] = useState(0);
+  const raf = useRef<number | null>(null);
   useEffect(() => {
     if (target === null) return;
-    if (target === 0) { setValue(0); return; }
-
+    if (target === 0) { setVal(0); return; }
     const start = performance.now();
-    const from  = 0;
-
     const tick = (now: number) => {
-      const progress = Math.min((now - start) / duration, 1);
-      const eased    = 1 - Math.pow(1 - progress, 3);
-      setValue(Math.round(from + (target - from) * eased));
-      if (progress < 1) rafRef.current = requestAnimationFrame(tick);
+      const p = Math.min((now - start) / duration, 1);
+      setVal(Math.round(target * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf.current = requestAnimationFrame(tick);
     };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+    raf.current = requestAnimationFrame(tick);
+    return () => { if (raf.current) cancelAnimationFrame(raf.current); };
   }, [target, duration]);
-
-  return value;
+  return val;
 }
 
-function StatCard({
-  label,
-  value,
-  rawValue,
-  sub,
-  color,
-  prefix = "",
-  suffix = "",
-}: {
-  label: string;
-  value: string;
-  rawValue: number | null;
-  sub?: string;
-  color?: string;
-  prefix?: string;
-  suffix?: string;
-}) {
-  const counted = useCountUp(rawValue);
-  const display = rawValue === null ? "—" : `${prefix}${counted.toLocaleString()}${suffix}`;
-
+function StatCard({ label, icon, value, sub, glow }: { label: string; icon: string; value: string; sub?: string; glow?: string }) {
   return (
-    <div
-      className="card rounded-2xl px-5 py-4 flex-1 cursor-default"
-      style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-    >
-      <p
-        style={{
-          fontSize: "0.62rem",
-          color: "var(--text-3)",
-          textTransform: "uppercase",
-          letterSpacing: "0.12em",
-          marginBottom: 8,
-        }}
-      >
-        {label}
-      </p>
-      <p className="text-2xl font-bold tabular-nums" style={{ color: color ?? "var(--text)" }}>
-        {rawValue !== null ? display : value}
-      </p>
-      {sub && (
-        <p style={{ fontSize: "0.7rem", color: "var(--text-3)", marginTop: 4 }}>
-          {sub}
-        </p>
-      )}
+    <div className="glass card-3d" style={{ flex: 1, padding: "1.75rem 1.5rem", minWidth: 0, position: "relative", overflow: "hidden" }}>
+      <div className="scan-beam" />
+      <div style={{ fontSize: "1.5rem", marginBottom: "0.75rem", filter: glow ? `drop-shadow(0 0 6px ${glow})` : undefined }}>{icon}</div>
+      <p style={{ fontSize: "0.65rem", color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "0.4rem" }}>{label}</p>
+      <p style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.03em", color: "var(--text)", lineHeight: 1 }}>{value}</p>
+      {sub && <p style={{ fontSize: "0.75rem", color: "var(--text-3)", marginTop: "0.4rem" }}>{sub}</p>}
     </div>
   );
 }
 
 export default function StatsRow() {
   const [stats, setStats] = useState<Stats | null>(null);
+  useEffect(() => { fetch("/api/stats").then(r => r.json()).then(setStats); }, []);
 
-  useEffect(() => {
-    fetch("/api/stats").then((r) => r.json()).then(setStats);
-  }, []);
+  const profit   = stats?.totalProfit ?? 0;
+  const sessions = useCountUp(stats?.totalSessions ?? null);
+  const hands    = useCountUp(stats?.totalHands ?? null);
+  const winRate  = stats && stats.totalSessions > 0 ? Math.round(stats.winSessions / stats.totalSessions * 100) : null;
+  const countedWinRate = useCountUp(winRate);
+  const countedProfit  = useCountUp(stats != null ? Math.abs(profit) : null);
 
-  const profit  = stats?.totalProfit ?? 0;
-  const winRate = stats && stats.totalSessions > 0
-    ? Math.round((stats.winSessions / stats.totalSessions) * 100)
-    : null;
+  const profitStr = stats == null ? "—"
+    : `${profit >= 0 ? "+" : "-"}$${countedProfit.toLocaleString()}`;
 
   return (
-    <div className="flex gap-3 flex-wrap">
+    <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
       <StatCard
         label="Total Profit"
-        value={stats == null ? "—" : `${profit >= 0 ? "+" : "-"}$${Math.abs(profit).toLocaleString()}`}
-        rawValue={stats == null ? null : Math.abs(profit)}
-        prefix={stats != null ? (profit >= 0 ? "+$" : "-$") : ""}
-        color={stats == null ? "var(--text)" : profit >= 0 ? "var(--green)" : "var(--red)"}
-        sub={stats ? `${stats.totalSessions} session${stats.totalSessions !== 1 ? "s" : ""}` : undefined}
+        icon="💰"
+        value={profitStr}
+        sub={stats ? `${sessions} sessions` : undefined}
+        glow={stats && profit >= 0 ? "rgba(22,199,132,0.6)" : undefined}
       />
       <StatCard
         label="Win Rate"
-        value={winRate != null ? `${winRate}%` : "—"}
-        rawValue={winRate}
-        suffix="%"
+        icon="🎯"
+        value={winRate != null ? `${countedWinRate}%` : "—"}
         sub={stats ? `${stats.winSessions} winning sessions` : undefined}
+        glow="rgba(240,180,41,0.6)"
       />
       <StatCard
         label="Hands Reviewed"
-        value={stats == null ? "—" : String(stats.totalHands)}
-        rawValue={stats?.totalHands ?? null}
+        icon="♠"
+        value={stats == null ? "—" : String(hands)}
         sub="with AI coach feedback"
+        glow="rgba(129,140,248,0.6)"
       />
     </div>
   );
