@@ -4,9 +4,11 @@ import { SYSTEM_PROMPT, buildConversationMessages } from "@/lib/prompts";
 import { ChatMessage } from "@/lib/types";
 import { parseHand } from "@/lib/hand-parser";
 import { extractLeakSignals } from "@/lib/leak-engine";
-import { insertHandReview, upsertLeakSummary } from "@/lib/db";
+import { insertHandReview, upsertLeakSummary, getTodayHandCount, getSubscriptionStatus } from "@/lib/db";
 import { getMemoryContext } from "@/lib/coach-memory";
 import { getUser } from "@/lib/supabase/server";
+
+const FREE_DAILY_LIMIT = 3;
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -15,6 +17,18 @@ export async function POST(req: NextRequest) {
   if (!user) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Free tier limit check
+  const [plan, todayCount] = await Promise.all([
+    getSubscriptionStatus(user.id),
+    getTodayHandCount(user.id),
+  ]);
+  if (plan === "free" && todayCount >= FREE_DAILY_LIMIT) {
+    return new Response(JSON.stringify({ error: "daily_limit_reached" }), {
+      status: 402,
       headers: { "Content-Type": "application/json" },
     });
   }

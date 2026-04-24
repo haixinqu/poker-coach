@@ -205,3 +205,59 @@ export async function getStats(userId: string): Promise<Stats> {
     winSessions: winsRes.count ?? 0,
   };
 }
+
+// ── Today's hand count (for free tier limit) ────────────────────────
+export async function getTodayHandCount(userId: string): Promise<number> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const { count } = await getClient()
+    .from("hand_reviews")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .gte("created_at", today.toISOString());
+  return count ?? 0;
+}
+
+// ── Conversation persistence ─────────────────────────────────────────
+export interface StoredMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export async function loadConversation(userId: string): Promise<StoredMessage[]> {
+  const { data } = await getClient()
+    .from("conversations")
+    .select("messages")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return (data?.messages as StoredMessage[]) ?? [];
+}
+
+export async function saveConversation(userId: string, messages: StoredMessage[]) {
+  await getClient().from("conversations").upsert(
+    { user_id: userId, messages, updated_at: new Date().toISOString() },
+    { onConflict: "user_id" },
+  );
+}
+
+export async function clearConversation(userId: string) {
+  await getClient()
+    .from("conversations")
+    .update({ messages: [], updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+}
+
+// ── Subscription status ──────────────────────────────────────────────
+export async function getSubscriptionStatus(userId: string): Promise<"free" | "pro"> {
+  const { data } = await getClient()
+    .from("subscriptions")
+    .select("status, current_period_end")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!data || data.status === "free") return "free";
+  if (data.status === "pro" && data.current_period_end) {
+    return new Date(data.current_period_end) > new Date() ? "pro" : "free";
+  }
+  return "free";
+}

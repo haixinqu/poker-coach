@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback, FormEvent } from "react";
 import MessageBubble from "./MessageBubble";
 import { ChatMessage } from "@/lib/types";
 
-const STORAGE_KEY = "poker-coach-messages";
+const STORAGE_KEY = "poker-coach-messages-cache";
 const MAX_STORED  = 40;
 
 const QUICK_ACTIONS = [
@@ -98,11 +98,42 @@ export default function ChatWindow() {
   const [input, setInput]         = useState("");
   const [streaming, setStreaming]  = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [limitHit, setLimitHit]   = useState(false);
   const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const saveTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { setMessages(loadMessages()); setHydrated(true); }, []);
-  useEffect(() => { if (hydrated) saveMessages(messages); }, [messages, hydrated]);
+  // Load from server on mount, fall back to localStorage cache
+  useEffect(() => {
+    fetch("/api/chat/history")
+      .then(r => r.json())
+      .then(d => {
+        const serverMsgs: ChatMessage[] = d.messages ?? [];
+        if (serverMsgs.length > 0) {
+          setMessages(serverMsgs);
+        } else {
+          setMessages(loadMessages());
+        }
+      })
+      .catch(() => setMessages(loadMessages()))
+      .finally(() => setHydrated(true));
+  }, []);
+
+  // Debounced save to server + localStorage cache
+  useEffect(() => {
+    if (!hydrated) return;
+    saveMessages(messages);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      if (messages.length > 0) {
+        fetch("/api/chat/history", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages }),
+        }).catch(() => {});
+      }
+    }, 800);
+  }, [messages, hydrated]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   function autoResize() {
@@ -114,8 +145,10 @@ export default function ChatWindow() {
 
   const clearHistory = useCallback(() => {
     setMessages([]);
+    setLimitHit(false);
     localStorage.removeItem(STORAGE_KEY);
     setSidebarOpen(false);
+    fetch("/api/chat/history", { method: "DELETE" }).catch(() => {});
   }, []);
 
   function fillPrompt(p: string) {
@@ -142,6 +175,12 @@ export default function ChatWindow() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: next }),
       });
+      if (res.status === 402) {
+        setLimitHit(true);
+        setStreaming(false);
+        setMessages(next);
+        return;
+      }
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
       const reader = res.body.getReader();
       const dec    = new TextDecoder();
@@ -356,6 +395,19 @@ export default function ChatWindow() {
           {showDots && <ThinkingDots />}
           <div ref={bottomRef} />
         </div>
+
+        {/* Free tier limit banner */}
+        {limitHit && (
+          <div className="animate-fade-up" style={{ padding: "0.875rem 1.5rem", borderTop: "1px solid rgba(240,180,41,0.2)", background: "rgba(240,180,41,0.06)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+            <div>
+              <p style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--gold)" }}>Daily limit reached</p>
+              <p style={{ fontSize: "0.75rem", color: "var(--text-3)", marginTop: 2 }}>Free plan includes 3 hand reviews per day. Upgrade for unlimited access.</p>
+            </div>
+            <a href="/pricing" style={{ padding: "0.5rem 1.1rem", borderRadius: 10, background: "var(--gold)", color: "#050509", fontSize: "0.82rem", fontWeight: 700, textDecoration: "none", flexShrink: 0, boxShadow: "0 0 16px rgba(240,180,41,0.3)" }}>
+              Upgrade →
+            </a>
+          </div>
+        )}
 
         {/* Input */}
         <div style={{ padding: "1rem 1.5rem 1.5rem", borderTop: "1px solid var(--border)", flexShrink: 0 }}>
