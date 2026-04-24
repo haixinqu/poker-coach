@@ -6,12 +6,20 @@ import { parseHand } from "@/lib/hand-parser";
 import { extractLeakSignals } from "@/lib/leak-engine";
 import { insertHandReview, upsertLeakSummary } from "@/lib/db";
 import { getMemoryContext } from "@/lib/coach-memory";
+import { getUser } from "@/lib/supabase/server";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: NextRequest) {
-  const { messages } = await req.json();
+  const user = await getUser();
+  if (!user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
+  const { messages } = await req.json();
   if (!messages || !Array.isArray(messages)) {
     return new Response(JSON.stringify({ error: "messages required" }), {
       status: 400,
@@ -19,14 +27,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return new Response(
-      JSON.stringify({ error: "ANTHROPIC_API_KEY is not set" }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
-  }
-
-  const memory = await getMemoryContext("default");
+  const memory = await getMemoryContext(user.id);
   const systemPrompt = memory.recentHandsSummary
     ? `${SYSTEM_PROMPT}\n\n## Player's prior hands (reference when relevant — especially for pattern recognition)\n${memory.recentHandsSummary}`
     : SYSTEM_PROMPT;
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
     (messages as ChatMessage[]).filter((m) => m.role === "user").at(-1)
       ?.content ?? "";
 
+  const userId = user.id;
   const readableStream = new ReadableStream({
     async start(controller) {
       let fullResponse = "";
@@ -68,7 +70,7 @@ export async function POST(req: NextRequest) {
         try {
           const parsed = parseHand(lastUserMsg);
           const signals = extractLeakSignals(parsed);
-          await insertHandReview({
+          await insertHandReview(userId, {
             rawInput: lastUserMsg,
             parsedHand: parsed,
             aiResponse: fullResponse,
@@ -76,7 +78,7 @@ export async function POST(req: NextRequest) {
           });
           for (const s of signals) {
             if (s.category !== "unknown") {
-              await upsertLeakSummary(s.category, s.confidence);
+              await upsertLeakSummary(userId, s.category, s.confidence);
             }
           }
         } catch {

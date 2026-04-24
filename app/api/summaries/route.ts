@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { getLeakSummaries } from "@/lib/db";
 import { leakCategoryLabel } from "@/lib/leak-engine";
+import { getUser } from "@/lib/supabase/server";
 
 export async function GET() {
-  const rows = await getLeakSummaries();
+  const user = await getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const rows = await getLeakSummaries(user.id);
   const summaries = rows.map((r) => ({
     id: String(r.id),
     category: r.category,

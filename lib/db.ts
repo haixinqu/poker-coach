@@ -49,14 +49,17 @@ export interface Stats {
   winSessions: number;
 }
 
-export async function insertHandReview(data: {
-  rawInput: string;
-  parsedHand?: object;
-  aiResponse?: string;
-  leakSignals?: object[];
-}) {
+export async function insertHandReview(
+  userId: string,
+  data: {
+    rawInput: string;
+    parsedHand?: object;
+    aiResponse?: string;
+    leakSignals?: object[];
+  },
+) {
   await getClient().from("hand_reviews").insert({
-    user_id: "default",
+    user_id: userId,
     raw_input: data.rawInput,
     parsed_hand: data.parsedHand ? JSON.stringify(data.parsedHand) : null,
     ai_response: data.aiResponse ?? null,
@@ -64,16 +67,19 @@ export async function insertHandReview(data: {
   });
 }
 
-export async function insertSession(data: {
-  rawInput: string;
-  parsedSession?: object;
-  resultAmount?: number;
-  stakes?: string;
-  location?: string;
-  durationMinutes?: number;
-}) {
+export async function insertSession(
+  userId: string,
+  data: {
+    rawInput: string;
+    parsedSession?: object;
+    resultAmount?: number;
+    stakes?: string;
+    location?: string;
+    durationMinutes?: number;
+  },
+) {
   await getClient().from("session_logs").insert({
-    user_id: "default",
+    user_id: userId,
     raw_input: data.rawInput,
     parsed_session: data.parsedSession ? JSON.stringify(data.parsedSession) : null,
     result_amount: data.resultAmount ?? null,
@@ -84,6 +90,7 @@ export async function insertSession(data: {
 }
 
 export async function upsertLeakSummary(
+  userId: string,
   category: string,
   confidence: number,
   example?: string,
@@ -92,7 +99,7 @@ export async function upsertLeakSummary(
   const { data: existing } = await db
     .from("leak_summaries")
     .select("count, confidence")
-    .eq("user_id", "default")
+    .eq("user_id", userId)
     .eq("category", category)
     .maybeSingle();
 
@@ -111,11 +118,11 @@ export async function upsertLeakSummary(
         ...(example ? { example } : {}),
         last_updated_at: new Date().toISOString(),
       })
-      .eq("user_id", "default")
+      .eq("user_id", userId)
       .eq("category", category);
   } else {
     await db.from("leak_summaries").insert({
-      user_id: "default",
+      user_id: userId,
       category,
       confidence,
       count: 1,
@@ -124,59 +131,64 @@ export async function upsertLeakSummary(
   }
 }
 
-export async function getLeakSummaries(): Promise<LeakSummaryRow[]> {
+export async function getLeakSummaries(userId: string): Promise<LeakSummaryRow[]> {
   const { data } = await getClient()
     .from("leak_summaries")
     .select("id, category, confidence, count, example")
-    .eq("user_id", "default")
+    .eq("user_id", userId)
     .order("confidence", { ascending: false });
   return (data ?? []) as LeakSummaryRow[];
 }
 
-export async function getSessionLogs(): Promise<SessionLogRow[]> {
+export async function getSessionLogs(userId: string): Promise<SessionLogRow[]> {
   const { data } = await getClient()
     .from("session_logs")
     .select("id, result_amount, stakes, location, created_at")
-    .eq("user_id", "default")
+    .eq("user_id", userId)
     .order("created_at", { ascending: true });
   return (data ?? []) as SessionLogRow[];
 }
 
-export async function getRecentHandReviews(limit = 5): Promise<HandReviewRow[]> {
+export async function getRecentHandReviews(
+  userId: string,
+  limit = 5,
+): Promise<HandReviewRow[]> {
   const { data } = await getClient()
     .from("hand_reviews")
     .select("id, raw_input, ai_response, leak_signals, created_at")
-    .eq("user_id", "default")
+    .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit);
   return (data ?? []) as HandReviewRow[];
 }
 
-export async function getAllSessions(): Promise<FullSessionRow[]> {
+export async function getAllSessions(userId: string): Promise<FullSessionRow[]> {
   const { data } = await getClient()
     .from("session_logs")
-    .select("id, raw_input, result_amount, stakes, location, duration_minutes, created_at")
-    .eq("user_id", "default")
+    .select(
+      "id, raw_input, result_amount, stakes, location, duration_minutes, created_at",
+    )
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   return (data ?? []) as FullSessionRow[];
 }
 
-export async function getStats(): Promise<Stats> {
+export async function getStats(userId: string): Promise<Stats> {
   const db = getClient();
   const [handsRes, sessionsRes, profitRes, winsRes] = await Promise.all([
     db
       .from("hand_reviews")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", "default"),
+      .eq("user_id", userId),
     db
       .from("session_logs")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", "default"),
-    db.from("session_logs").select("result_amount").eq("user_id", "default"),
+      .eq("user_id", userId),
+    db.from("session_logs").select("result_amount").eq("user_id", userId),
     db
       .from("session_logs")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", "default")
+      .eq("user_id", userId)
       .gt("result_amount", 0),
   ]);
 

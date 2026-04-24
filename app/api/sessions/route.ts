@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionLogs, getAllSessions } from "@/lib/db";
+import { getUser } from "@/lib/supabase/server";
 
 export async function GET(req: NextRequest): Promise<Response> {
+  const user = await getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { searchParams } = new URL(req.url);
 
   if (searchParams.get("view") === "list") {
-    const rows = await getAllSessions();
+    const rows = await getAllSessions(user.id);
     return NextResponse.json({ sessions: rows });
   }
 
-  // Chart data: cumulative profit per session
-  const rows = await getSessionLogs();
+  const rows = await getSessionLogs(user.id);
   let cumulative = 0;
   const sessions = rows.map((r, i) => {
     cumulative += r.result_amount ?? 0;

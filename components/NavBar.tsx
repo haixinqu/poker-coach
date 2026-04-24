@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
 
 const NAV_LINKS = [
   { href: "/chat", label: "Coach" },
@@ -50,7 +52,25 @@ function NavLink({ href, label }: { href: string; label: string }) {
 
 export default function NavBar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <>
@@ -82,16 +102,29 @@ export default function NavBar() {
         </div>
 
         <div className="ml-auto flex items-center gap-3">
-          <span
-            className="text-xs px-2 py-0.5 rounded-full font-medium hidden sm:inline"
-            style={{
-              background: "rgba(22,199,132,0.12)",
-              color: "var(--green)",
-              border: "1px solid rgba(22,199,132,0.25)",
-            }}
-          >
-            MVP
-          </span>
+          {user && (
+            <span
+              className="text-xs hidden sm:inline truncate max-w-[140px]"
+              style={{ color: "var(--text-3)" }}
+              title={user.email}
+            >
+              {user.email}
+            </span>
+          )}
+          {user && (
+            <button
+              onClick={handleLogout}
+              className="text-xs px-2.5 py-1 rounded-lg transition-colors hidden sm:inline-block"
+              style={{
+                color: "var(--text-3)",
+                border: "1px solid var(--border)",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-2)")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-3)")}
+            >
+              Sign out
+            </button>
+          )}
           <button
             className="md:hidden p-2 flex flex-col gap-1.5"
             onClick={() => setMenuOpen((v) => !v)}
@@ -150,6 +183,15 @@ export default function NavBar() {
                 {l.label}
               </Link>
             ))}
+            {user && (
+              <button
+                onClick={handleLogout}
+                className="px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-colors duration-150"
+                style={{ color: "var(--text-3)" }}
+              >
+                Sign out
+              </button>
+            )}
           </div>
         </div>
       )}

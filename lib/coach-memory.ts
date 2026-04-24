@@ -11,8 +11,8 @@ interface LeakSignalRaw {
   confidence: number;
 }
 
-export async function getMemoryContext(_userId: string): Promise<MemoryContext> {
-  const hands = await getRecentHandReviews(6);
+export async function getMemoryContext(userId: string): Promise<MemoryContext> {
+  const hands = await getRecentHandReviews(userId, 6);
 
   if (hands.length === 0) {
     return { recentHandsSummary: null, playerProfile: null };
