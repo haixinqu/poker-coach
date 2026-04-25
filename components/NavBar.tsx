@@ -16,6 +16,7 @@ const NAV_LINKS = [
 export default function NavBar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser]         = useState<User | null>(null);
+  const [plan, setPlan]         = useState<"free" | "pro">("free");
   const pathname = usePathname();
   const router   = useRouter();
   const supabase = createClient();
@@ -26,6 +27,11 @@ export default function NavBar() {
     return () => subscription.unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/user/plan").then(r => r.json()).then(d => setPlan(d.plan)).catch(() => {});
+  }, [user]);
 
   if (pathname === "/login") return null;
 
@@ -97,6 +103,27 @@ export default function NavBar() {
 
         {/* Right side */}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          {user && plan === "free" && (
+            <a
+              href="/pricing"
+              style={{
+                padding: "0.35rem 0.875rem", borderRadius: 8, fontSize: "0.78rem", fontWeight: 700,
+                background: "linear-gradient(135deg, var(--gold), #d4940a)",
+                color: "#050509", textDecoration: "none",
+                boxShadow: "0 0 14px rgba(240,180,41,0.3)",
+                transition: "box-shadow 0.2s",
+              }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = "0 0 22px rgba(240,180,41,0.5)"}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = "0 0 14px rgba(240,180,41,0.3)"}
+            >
+              Upgrade ✦
+            </a>
+          )}
+          {user && plan === "pro" && (
+            <span style={{ fontSize: "0.72rem", padding: "0.25rem 0.65rem", borderRadius: 6, background: "rgba(22,199,132,0.1)", color: "var(--green)", border: "1px solid rgba(22,199,132,0.25)", fontWeight: 600 }}>
+              Pro ✦
+            </span>
+          )}
           {user && (
             <>
               <span className="hidden sm:block" style={{ fontSize: "0.75rem", color: "var(--text-3)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
